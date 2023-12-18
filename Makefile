@@ -9,4 +9,4 @@ client: client.c
 	./client
 
 clean:
-	rm -rf *.o *.out
+	rm -rf *.o *.out ./server ./client
