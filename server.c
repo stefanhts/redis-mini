@@ -8,11 +8,14 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include "store.h"
+
 #define PORT 3000
 #define BUFF_SIZE 1048
 
 int handleConnection(int cfd) {
   char r_buff[BUFF_SIZE];
+  char *str;
   char *respond = "Hello ";
   while (1) {
     ssize_t b_recv = recv(cfd, r_buff, sizeof(r_buff), 0);
@@ -21,6 +24,8 @@ int handleConnection(int cfd) {
       close(cfd);
       return 1;
     }
+    str = malloc(strlen(r_buff) + 1);
+    strcpy(str, r_buff);
     if (b_recv >= BUFF_SIZE) {
       r_buff[BUFF_SIZE - 1] = '\0';
     } else {
@@ -29,10 +34,12 @@ int handleConnection(int cfd) {
     if (!strcmp(r_buff, "PING")) {
       send(cfd, "PONG", strlen("PONG"), 0);
     } else {
-      send(cfd, respond, strlen(respond), 0);
-      send(cfd, r_buff, strlen(r_buff), 0);
+      char *token, *tofree;
+      while((token = strsep(&str, " ")) != NULL) {
+        send(cfd, token, strlen(token), 0);
+        send(cfd, ", ", strlen(", "), 0);
+      }
     }
-
     printf("got: %s", r_buff);
   }
 
@@ -40,6 +47,7 @@ int handleConnection(int cfd) {
 }
 
 int main() {
+  initStore(4);
 
   // disable output buffering
   setbuf(stdout, NULL);
