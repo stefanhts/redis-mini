@@ -7,18 +7,20 @@ struct Key {
 };
 
 struct Pair {
-    struct char* key;
-    struct char* value;
+    char* key;
+    char* value;
 };
 
 struct Store {
-    struct Pair* items;
+    struct Pair** items;
     size_t len;
     size_t capacity;
 };
 
 struct Store* initStore(size_t len) {
     struct Store *s = malloc(sizeof(struct Pair) * len);
+    s->len = 1;
+    s->capacity = len;
     return s;
 }
 
@@ -29,10 +31,15 @@ void freeStore(struct Store *s) {
     free(s);
 }
 
+void growStore(struct Store **s) {
+    // TODO: implement this
+    printf("NOT IMPLEMENTED YET: `growStore()`");
+}
+
 void insert(struct Store* s, char* key, char* value) {
-    struct *Pair p = (*Pair)malloc(sizeof(Pair));
-    p->key = (*char)malloc(strlen(key));
-    p->value = (*char)malloc(strlen(value));
+    struct Pair *p = (struct Pair*)malloc(sizeof(struct Pair));
+    p->key = (char*)malloc(strlen(key));
+    p->value = (char*)malloc(strlen(value));
     strcpy(p->key, key);
     strcpy(p->value, value);
     // Check if the length of the store with a new element will exceed the allotted lenght, if so, allocate more space
@@ -46,7 +53,6 @@ void insert(struct Store* s, char* key, char* value) {
     s->len = s->len + 1;
 }
 
-void growStore(struct Store **s) {
-    // TODO: implement this
-    printf("NOT IMPLEMENTED YET: `growStore()`");
+int length(struct Store *s) {
+    return s->len;
 }
