@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"github.com/stefanhts/redis-mini/data"
 	"net"
 	"strings"
 )
@@ -79,6 +80,45 @@ func echo(args []string, conn net.Conn) {
 	}
 }
 
+func errorMsg(cmd string, conn net.Conn) {
+	_, err := conn.Write([]byte("Error running command: " + cmd))
+	if err != nil {
+		fmt.Printf("Error writing: %s", err)
+	}
+}
+
+func push(conn net.Conn, args ...string) {
+	data.Push(args[0], args[1])
+	msg := fmt.Sprintf("Pushed %s => %s\n", args[0], args[1])
+	_, err := conn.Write([]byte(msg))
+	if err != nil {
+		fmt.Printf("Error writing: %s", err)
+	}
+}
+
+func pop(conn net.Conn) {
+	el, err := data.Pop()
+	var msg string
+	if err != nil {
+		msg = fmt.Sprintf("Error popping from list: %s", err)
+
+	}
+	msg = fmt.Sprintf("Popped: %s => %s\n", el.Key, el.Value)
+	_, err = conn.Write([]byte(msg))
+	if err != nil {
+		fmt.Printf("Error writing: %s", err)
+	}
+}
+
+func llen(conn net.Conn) {
+	length := data.LLen()
+	msg := fmt.Sprintf("LLEN: %d\n", length)
+	_, err := conn.Write([]byte(msg))
+	if err != nil {
+		fmt.Printf("Error writing: %s", err)
+	}
+}
+
 func handleArgs(args []string, conn net.Conn) {
 	switch strings.ToLower(args[0]) {
 	case "ping":
@@ -93,9 +133,24 @@ func handleArgs(args []string, conn net.Conn) {
 		} else {
 			echo([]string{}, conn)
 		}
-
+	case "push":
+		if len(args) != 3 {
+			errorMsg(args[0], conn)
+		} else {
+			push(conn, args[1:]...)
+		}
+	case "pop":
+		if len(args) != 1 {
+			errorMsg(args[0], conn)
+		} else {
+			pop(conn)
+		}
 	case "llen":
-		fmt.Printf("LLEN not implemented yet\n")
+		if len(args) != 1 {
+			errorMsg(args[0], conn)
+		} else {
+			llen(conn)
+		}
 	default:
 		fmt.Printf("unsupported command: %s\n", args[0])
 
