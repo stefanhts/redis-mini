@@ -3,12 +3,17 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"github.com/stefanhts/redis-mini/data"
 	"net"
+	"strconv"
 	"strings"
+
+	"github.com/stefanhts/redis-mini/data"
 )
 
+var store *data.Store
+
 func main() {
+	store = data.NewStore()
 	listener, err := net.Listen("tcp", "localhost:8080")
 	if err != nil {
 		fmt.Println(err)
@@ -80,42 +85,64 @@ func echo(args []string, conn net.Conn) {
 	}
 }
 
-func errorMsg(cmd string, conn net.Conn) {
+func errorMsg(conn net.Conn, cmd string) {
 	_, err := conn.Write([]byte("Error running command: " + cmd))
 	if err != nil {
 		fmt.Printf("Error writing: %s", err)
 	}
 }
 
-func push(conn net.Conn, args ...string) {
-	data.Push(args[0], args[1])
-	msg := fmt.Sprintf("Pushed %s => %s\n", args[0], args[1])
+func push(conn net.Conn, key string, vals ...string) {
+	pushed := store.LPush(key, vals...)
+	msg := fmt.Sprintf("Pushed %d values to key %s \n", pushed, key)
 	_, err := conn.Write([]byte(msg))
 	if err != nil {
-		fmt.Printf("Error writing: %s", err)
+		fmt.Printf("Error writing: %s\n", err)
 	}
 }
 
-func pop(conn net.Conn) {
-	el, err := data.Pop()
-	var msg string
-	if err != nil {
-		msg = fmt.Sprintf("Error popping from list: %s", err)
+func pop(conn net.Conn, key string, num int64) {
+	els, err := store.LPop(key, num)
+	msg := "Popped: "
 
+	if err != nil {
+		msg = fmt.Sprintf("Error popping from list: %s\n", err)
 	}
-	msg = fmt.Sprintf("Popped: %s => %s\n", el.Key, el.Value)
+
+	for _, el := range els {
+		msg += el + " "
+	}
+
+	if len(els) == 0 {
+		msg += "nothing"
+	}
+
+	msg += "from key " + key + "\n"
+
 	_, err = conn.Write([]byte(msg))
 	if err != nil {
-		fmt.Printf("Error writing: %s", err)
+		fmt.Printf("Error writing: %s\n", err)
 	}
 }
 
-func llen(conn net.Conn) {
-	length := data.LLen()
-	msg := fmt.Sprintf("LLEN: %d\n", length)
+func llen(conn net.Conn, key string) {
+	length := store.LLen(key)
+	msg := fmt.Sprintf("LLEN: %d, for key: %s\n", length, key)
 	_, err := conn.Write([]byte(msg))
 	if err != nil {
-		fmt.Printf("Error writing: %s", err)
+		fmt.Printf("Error writing: %s\n", err)
+	}
+}
+
+func lpos(conn net.Conn, key string, val string) {
+	pos, err := store.LPos(key, val)
+	msg := fmt.Sprintf("Position for key: %s, val: %s is: %d\n", key, val, pos)
+	if err != nil {
+		msg = "error getting LPOS\n"
+	}
+	_, err = conn.Write([]byte(msg))
+	if err != nil {
+		fmt.Printf("Error writing: %s\n", err)
 	}
 }
 
@@ -133,24 +160,33 @@ func handleArgs(args []string, conn net.Conn) {
 		} else {
 			echo([]string{}, conn)
 		}
-	case "push":
-		if len(args) != 3 {
-			errorMsg(args[0], conn)
+	case "lpush":
+		if len(args) < 3 {
+			errorMsg(conn, args[0])
 		} else {
-			push(conn, args[1:]...)
+			push(conn, args[1], args[2:]...)
 		}
-	case "pop":
-		if len(args) != 1 {
-			errorMsg(args[0], conn)
+	case "lpop":
+		if len(args) <= 1 {
+			errorMsg(conn, args[0])
 		} else {
-			pop(conn)
+			num, _ := strconv.ParseInt(args[2], 10, 64)
+			pop(conn, args[1], num)
 		}
 	case "llen":
-		if len(args) != 1 {
-			errorMsg(args[0], conn)
+		if len(args) <= 1 {
+			errorMsg(conn, args[0])
 		} else {
-			llen(conn)
+			llen(conn, args[1])
 		}
+
+	case "lpos":
+		if len(args) != 3 {
+			errorMsg(conn, args[0])
+		} else {
+			lpos(conn, args[1], args[2])
+		}
+
 	default:
 		fmt.Printf("unsupported command: %s\n", args[0])
 

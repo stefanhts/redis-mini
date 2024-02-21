@@ -1,52 +1,80 @@
 package data
 
 import (
-	"fmt"
+	"errors"
+	"sync"
 )
 
-type Element struct {
-	Key   string
-	Value string
+type Store struct {
+	lists map[string][]string
+	lock  sync.Mutex
 }
 
-var Store []Element
-
-func initStore() {
-	Store = []Element{}
+func NewStore() *Store {
+	return &Store{lists: make(map[string][]string)}
 }
 
-func Push(key, val string) {
-	Store = append(Store, Element{
-		Key:   key,
-		Value: val,
-	})
-}
+func (s *Store) LLen(key string) int {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 
-func Pop() (Element, error) {
-	if len(Store) < 1 {
-		return Element{}, fmt.Errorf("Pop error: no elements in list")
+	list, ok := s.lists[key]
+	if !ok {
+		return 0
 	}
-	el := Store[len(Store)-1]
-	Store = Store[:len(Store)-1]
-	return el, nil
+
+	return len(list)
 }
 
-func LLen() int {
-	return len(Store)
+func (s *Store) LPush(key string, values ...string) int {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	list := s.lists[key]
+	for _, value := range values {
+		list = append([]string{value}, list...)
+	}
+	s.lists[key] = list
+
+	return len(values)
 }
 
-func Get(key string) (string, error) {
-	for _, el := range Store {
-		if el.Key == key {
-			return el.Value, nil
+func (s *Store) LPop(key string, num int64) ([]string, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	list, ok := s.lists[key]
+	if !ok {
+		return []string{}, errors.New("key not found")
+	}
+
+	if len(list) == 0 {
+		return []string{}, nil
+	}
+
+	if int(num) > len(list) {
+		num = int64(len(list))
+	}
+
+	values := list[:num]
+	s.lists[key] = list[num:]
+	return values, nil
+}
+
+func (s *Store) LPos(key, value string) (int, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	list, ok := s.lists[key]
+	if !ok {
+		return -1, errors.New("key not found")
+	}
+
+	for i, v := range list {
+		if v == value {
+			return i, nil
 		}
 	}
-	return "", fmt.Errorf("Get error: key not found %s", key)
-}
 
-func GetInd(ind int) (Element, error) {
-	if ind >= len(Store) {
-		return Element{}, fmt.Errorf("GetInd: index %d is out of bounds %d", ind, len(Store))
-	}
-	return Store[ind], nil
+	return -1, nil
 }
